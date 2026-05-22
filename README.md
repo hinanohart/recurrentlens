@@ -6,6 +6,8 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
+**Colab notebooks:** [Quickstart](https://colab.research.google.com/github/hinanohart/recurrentlens/blob/main/notebooks/01_quickstart.ipynb) · [Explore pretrained](https://colab.research.google.com/github/hinanohart/recurrentlens/blob/main/notebooks/02_explore_pretrained.ipynb) · [Train your own](https://colab.research.google.com/github/hinanohart/recurrentlens/blob/main/notebooks/03_train_mamba130m_sae.ipynb)
+
 ---
 
 ## ⚠️ v0.1.0 scope disclosure (read first)
@@ -77,6 +79,16 @@ Falcon-Mamba-7B, RWKV-7, and Jamba are **v0.2+** targets.
 - **Practicality**: load + smoke + viz + Hub stub gives users a 5-minute path to a working SAE pipeline.
 - **Limitation**: v0.1.0 has no pretrained SAE artifacts. Real recon-MSE / L0 / CE-recovery numbers will be published with v0.1.1 SAEs (trained via Colab T4).
 - **Open question**: do Mamba `out_proj_out` activations actually yield monosemantic SAE features? This is an empirical question the v0.1.1 release will answer.
+
+## Pretrained SAEs
+
+| repo_id | model | layer | hook | variant | d_sae | status |
+|---|---|---|---|---|---|---|
+| `hinanohart/recurrentlens-mamba130m-L2-sae` | mamba-130m | 2 | out_proj_out | topk | 16384 | **planned v0.1.1** |
+| `hinanohart/recurrentlens-mamba130m-L6-sae` | mamba-130m | 6 | out_proj_out | topk | 16384 | **planned v0.1.1** |
+| `hinanohart/recurrentlens-mamba130m-L10-sae` | mamba-130m | 10 | out_proj_out | topk | 16384 | **planned v0.1.1** |
+
+Want to seed this table? Run notebook 03 on Colab T4 and open a PR. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Citation
 

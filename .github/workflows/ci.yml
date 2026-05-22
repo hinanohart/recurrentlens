@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        run: pip install uv
+      - name: Install ruff
+        run: uv pip install --system ruff
+      - name: Ruff format check
+        run: ruff format --check src tests
+      - name: Ruff lint
+        run: ruff check src tests
+
+  no-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Grep for token-shaped strings
+        run: bash scripts/check_no_secrets.sh
+
+  unit-cpu:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install uv
+        run: pip install uv
+      - name: Install package + dev deps (CPU)
+        run: |
+          uv pip install --system -e ".[dev]"
+      - name: Pytest (smoke + unit, CPU)
+        env:
+          RECURRENTLENS_SKIP_GPU_TESTS: '1'
+        run: pytest -ra

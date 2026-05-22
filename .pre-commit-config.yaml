@@ -1,0 +1,14 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: no-secrets
+        name: Grep for token-shaped strings
+        entry: bash scripts/check_no_secrets.sh
+        language: system
+        pass_filenames: false

@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use recurrentlens in academic work, please cite it as below."
+title: "recurrentlens: mechanistic interpretability for State-Space Models"
+authors:
+  - family-names: "hinanohart"
+version: 0.1.0
+date-released: 2026-05-23
+license: Apache-2.0
+repository-code: "https://github.com/hinanohart/recurrentlens"
+keywords:
+  - mechanistic-interpretability
+  - sparse-autoencoder
+  - state-space-models
+  - mamba
+notes: |
+  v0.1.0 ships framework + scaffold + smoke + Colab notebooks. Pretrained
+  Mamba-130M SAE artifacts land in v0.1.1 (community Colab T4).

@@ -1,5 +1,6 @@
 """recurrentlens: mechanistic interpretability for State-Space Models."""
 
+from recurrentlens import bench, hub, viz
 from recurrentlens._version import __version__
 from recurrentlens.core.model import RecurrentLensModelImpl, load_model_impl
 from recurrentlens.core.protocols import SAE, RecurrentLensModel
@@ -13,6 +14,8 @@ from recurrentlens.core.types import (
     HookSite,
     SAEVariant,
 )
+from recurrentlens.features.ablate import ablate
+from recurrentlens.features.steer import steer
 
 __all__ = [
     "__version__",
@@ -43,10 +46,7 @@ def load_model(
     dtype=None,
     revision: str | None = None,
 ) -> RecurrentLensModelImpl:
-    """Load a Mamba/SSM model and wrap it as a RecurrentLensModel.
-
-    Performs network I/O when called.
-    """
+    """Load a Mamba/SSM model and wrap it as a RecurrentLensModel."""
     return load_model_impl(model_id=model_id, device=device, dtype=dtype, revision=revision)
 
 
@@ -57,39 +57,25 @@ def train_sae(
     variant: SAEVariant = "topk",
     d_sae: int = 16384,
     dataset: str = "HuggingFaceFW/fineweb-edu",
-    n_tokens: int = 100_000_000,
+    n_tokens: int = 5_000_000,
     cache_backend: CacheBackend = "mmap",
     save_to: str | None = None,
+    n_steps: int = 1000,
     **kwargs,
 ):
-    """Train a sparse autoencoder on a hooked activation site.
+    """End-to-end SAE training. See ``recurrentlens.sae.train.train_sae_full`` for details."""
+    from recurrentlens.sae.train import train_sae_full
 
-    Implemented in Phase 5 (training loop). Currently raises NotImplementedError.
-    """
-    raise NotImplementedError("train_sae: Phase 5 training loop not yet wired")
-
-
-def ablate(model, sae, feature_id, strength: float = 0.0):
-    """Zero-ablate (or scale-ablate) an SAE feature during the model's forward pass."""
-    raise NotImplementedError("ablate: Phase 7 not yet implemented")
-
-
-def steer(model, sae, feature_id, vector_scale: float = 1.0):
-    """Context-managed feature steering."""
-    raise NotImplementedError("steer: Phase 7 not yet implemented")
-
-
-class _DeferredSubmodule:
-    def __init__(self, name: str, phase: str):
-        self._name = name
-        self._phase = phase
-
-    def __getattr__(self, attr: str):
-        raise NotImplementedError(
-            f"recurrentlens.{self._name}.{attr}: {self._phase} not yet implemented"
-        )
-
-
-viz = _DeferredSubmodule("viz", "Phase 8")
-hub = _DeferredSubmodule("hub", "Phase 8")
-bench = _DeferredSubmodule("bench", "Phase 9")
+    return train_sae_full(
+        model=model,
+        hook_site=hook_site,
+        layer=layer,
+        variant=variant,
+        d_sae=d_sae,
+        dataset=dataset,
+        n_tokens=n_tokens,
+        cache_backend=cache_backend,
+        save_to=save_to,
+        n_steps=n_steps,
+        **kwargs,
+    )

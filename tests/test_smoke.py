@@ -1,7 +1,5 @@
 """Smoke tests: imports, version, public API surface."""
 
-import pytest
-
 import recurrentlens as rl
 from recurrentlens import SAE, RecurrentLensModel
 
@@ -31,31 +29,15 @@ def test_constants_exported():
     assert rl.DEFAULT_SAE_VARIANT == "topk"
 
 
-def test_train_sae_phase5_stub():
-    with pytest.raises(NotImplementedError, match="Phase 5"):
-        rl.train_sae(model=None, hook_site="out_proj_out", layer=0)
+def test_viz_callable():
+    fn = rl.viz.feature_explorer
+    assert callable(fn)
 
 
-def test_viz_deferred():
-    with pytest.raises(NotImplementedError, match="Phase 8"):
-        rl.viz.feature_explorer(None, 0)
+def test_hub_callable():
+    assert callable(rl.hub.load_sae)
+    assert callable(rl.hub.push_sae)
 
 
-def test_hub_deferred():
-    with pytest.raises(NotImplementedError, match="Phase 8"):
-        rl.hub.load_sae("some/repo")
-
-
-def test_bench_deferred():
-    with pytest.raises(NotImplementedError, match="Phase 9"):
-        rl.bench.evaluate(None)
-
-
-def test_ablate_deferred():
-    with pytest.raises(NotImplementedError, match="Phase 7"):
-        rl.ablate(None, None, 0)
-
-
-def test_steer_deferred():
-    with pytest.raises(NotImplementedError, match="Phase 7"):
-        rl.steer(None, None, 0)
+def test_bench_callable():
+    assert callable(rl.bench.evaluate)

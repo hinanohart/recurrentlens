@@ -115,7 +115,7 @@ class BaseSAE(nn.Module):
 
         with safe_open(path, framework="pt") as f:
             meta = f.metadata() or {}
-            tensors = {k: f.get_tensor(k) for k in f.keys()}
+            tensors = {k: f.get_tensor(k) for k in f}
 
         from recurrentlens.sae.variants import build_sae
 

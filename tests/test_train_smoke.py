@@ -32,7 +32,7 @@ def test_train_decreases_loss_on_synthetic_data():
         lr=1e-3,
     )
     torch.manual_seed(0)
-    sae = train_sae_from_cache(cache, config=config, n_steps=200)
+    train_sae_from_cache(cache, config=config, n_steps=200)
 
     losses = [row["loss"] for row in config.log_metrics]
     assert len(losses) >= 5

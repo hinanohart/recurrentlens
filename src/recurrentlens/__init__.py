@@ -1,12 +1,32 @@
 """recurrentlens: mechanistic interpretability for State-Space Models."""
 
 from recurrentlens._version import __version__
+from recurrentlens.core.model import RecurrentLensModelImpl, load_model_impl
 from recurrentlens.core.protocols import SAE, RecurrentLensModel
+from recurrentlens.core.types import (
+    CACHE_BACKENDS,
+    DEFAULT_HOOK_SITE,
+    DEFAULT_SAE_VARIANT,
+    HOOK_SITES,
+    SAE_VARIANTS,
+    CacheBackend,
+    HookSite,
+    SAEVariant,
+)
 
 __all__ = [
     "__version__",
     "SAE",
     "RecurrentLensModel",
+    "RecurrentLensModelImpl",
+    "HookSite",
+    "SAEVariant",
+    "CacheBackend",
+    "HOOK_SITES",
+    "SAE_VARIANTS",
+    "CACHE_BACKENDS",
+    "DEFAULT_HOOK_SITE",
+    "DEFAULT_SAE_VARIANT",
     "load_model",
     "train_sae",
     "ablate",
@@ -17,45 +37,45 @@ __all__ = [
 ]
 
 
-def load_model(model_id: str, device: str = "auto", dtype=None, revision: str | None = None):
+def load_model(
+    model_id: str,
+    device: str = "auto",
+    dtype=None,
+    revision: str | None = None,
+) -> RecurrentLensModelImpl:
     """Load a Mamba/SSM model and wrap it as a RecurrentLensModel.
 
-    Implemented in Phase 2. Currently raises NotImplementedError.
+    Performs network I/O when called.
     """
-    raise NotImplementedError("load_model: Phase 2 not yet implemented; tracking #2")
+    return load_model_impl(model_id=model_id, device=device, dtype=dtype, revision=revision)
 
 
 def train_sae(
     model,
-    hook_site: str = "out_proj_out",
+    hook_site: HookSite = "out_proj_out",
     layer: int = 0,
-    variant: str = "topk",
+    variant: SAEVariant = "topk",
     d_sae: int = 16384,
     dataset: str = "HuggingFaceFW/fineweb-edu",
     n_tokens: int = 100_000_000,
-    cache_backend: str = "mmap",
+    cache_backend: CacheBackend = "mmap",
     save_to: str | None = None,
+    **kwargs,
 ):
     """Train a sparse autoencoder on a hooked activation site.
 
-    Implemented in Phases 4-5. Currently raises NotImplementedError.
+    Implemented in Phase 5 (training loop). Currently raises NotImplementedError.
     """
-    raise NotImplementedError("train_sae: Phases 4-5 not yet implemented")
+    raise NotImplementedError("train_sae: Phase 5 training loop not yet wired")
 
 
 def ablate(model, sae, feature_id, strength: float = 0.0):
-    """Zero-ablate (or scale-ablate) an SAE feature during the model's forward pass.
-
-    Implemented in Phase 7. Currently raises NotImplementedError.
-    """
+    """Zero-ablate (or scale-ablate) an SAE feature during the model's forward pass."""
     raise NotImplementedError("ablate: Phase 7 not yet implemented")
 
 
 def steer(model, sae, feature_id, vector_scale: float = 1.0):
-    """Context-managed feature steering.
-
-    Implemented in Phase 7. Currently raises NotImplementedError.
-    """
+    """Context-managed feature steering."""
     raise NotImplementedError("steer: Phase 7 not yet implemented")
 
 

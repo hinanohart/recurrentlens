@@ -5,7 +5,7 @@ from recurrentlens import SAE, RecurrentLensModel
 
 
 def test_version():
-    assert rl.__version__ == "0.1.0"
+    assert rl.__version__ == "0.1.0.post1"
 
 
 def test_protocols_importable():

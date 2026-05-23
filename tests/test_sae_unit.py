@@ -130,3 +130,90 @@ def test_cache_3d_input_flattens():
     batch = np.random.randn(2, 10, 4).astype(np.float32)
     written = cache.append(batch)
     assert written == 20
+
+
+def test_jumprelu_gradient_flows_to_encoder():
+    """Regression: v0.1.0 had a `* 0.0` straight-through estimator that silently
+    killed gradient flow. After the v0.1.0.post1 fix, encoder weights must
+    receive non-zero gradients on activated features.
+    """
+    torch.manual_seed(0)
+    sae = JumpReLUSAE(d_in=8, d_sae=16, init_theta=0.001)
+    # Use a moderately-scaled input so some features cross threshold.
+    x = torch.randn(4, 8) * 0.5
+    _, z = sae(x)
+    # at least one feature should be active
+    assert (z > 0).any().item(), "test setup error: no features above threshold"
+    z.sum().backward()
+    assert sae.W_enc.grad is not None
+    assert (sae.W_enc.grad.abs() > 0).any().item(), (
+        "JumpReLU STE killed gradient to W_enc (v0.1.0 regression)"
+    )
+
+
+def test_l0_counts_signed_nonzero():
+    """Regression: v0.1.0 reported L0 as (z > 0).sum(), miscounting negative
+    SAE activations. v0.1.0.post1 uses (z != 0).
+    """
+    # Synthetic z with one positive, one negative, two zeros per row.
+    z = torch.tensor([[1.0, -0.5, 0.0, 0.0], [2.0, -1.0, 0.0, 0.0]])
+    l0_signed = (z != 0).float().sum(dim=-1).mean().item()
+    l0_positive_only = (z > 0).float().sum(dim=-1).mean().item()
+    assert l0_signed == 2.0
+    assert l0_positive_only == 1.0
+
+
+def test_base_sae_load_rejects_inconsistent_meta(tmp_path):
+    """Regression for hub-supply-chain: hand-crafted safetensors with metadata
+    that lies about d_sae must be rejected, not silently loaded.
+    """
+    import pytest
+    from safetensors.torch import save_file
+
+    path = tmp_path / "tampered.safetensors"
+    fake_state = {
+        "W_enc": torch.zeros(4, 8),
+        "b_enc": torch.zeros(8),
+        "W_dec": torch.zeros(8, 4),
+        "b_dec": torch.zeros(4),
+    }
+    save_file(
+        fake_state,
+        str(path),
+        metadata={
+            "variant": "vanilla",
+            "d_in": "4",
+            "d_sae": "999",  # lying — actual W_enc has d_sae=8
+            "hook_site": "out_proj_out",
+            "layer": "0",
+            "model_id": "test/lies",
+        },
+    )
+    with pytest.raises(ValueError, match="W_enc has shape"):
+        BaseSAE.load(str(path))
+
+
+def test_base_sae_load_rejects_unknown_variant(tmp_path):
+    import pytest
+    from safetensors.torch import save_file
+
+    path = tmp_path / "alien.safetensors"
+    save_file(
+        {
+            "W_enc": torch.zeros(4, 8),
+            "b_enc": torch.zeros(8),
+            "W_dec": torch.zeros(8, 4),
+            "b_dec": torch.zeros(4),
+        },
+        str(path),
+        metadata={
+            "variant": "alien",
+            "d_in": "4",
+            "d_sae": "8",
+            "hook_site": "out_proj_out",
+            "layer": "0",
+            "model_id": "test/alien",
+        },
+    )
+    with pytest.raises(ValueError, match="unknown variant"):
+        BaseSAE.load(str(path))

@@ -42,6 +42,21 @@ def test_train_decreases_loss_on_synthetic_data():
     assert late < early * 0.85, f"loss didn't decrease enough: early={early:.4f} late={late:.4f}"
 
 
+def test_cosine_lr_final_step_above_zero():
+    """Regression: v0.1.0's cosine_lr returned exactly 0.0 on the last step
+    (off-by-one). v0.1.0.post1 clamps the final LR to >=1% of base_lr.
+    """
+    from recurrentlens.sae.train import _cosine_lr
+
+    base_lr = 3e-4
+    total = 100
+    warmup = 5
+    final_lr = _cosine_lr(total, total, warmup, base_lr)
+    assert final_lr > 0.0
+    # >= 1% floor so AdamW still makes the last step useful
+    assert final_lr >= 0.01 * base_lr - 1e-12
+
+
 def test_train_save_load_roundtrip(tmp_path):
     rng = np.random.default_rng(1)
     d_in = 8

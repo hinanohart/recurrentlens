@@ -81,14 +81,18 @@ class JumpReLUSAE(BaseSAE):
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         z_pre = self.encode_pre(x)
         theta = self.theta
+        # Hard gate forward; the gate has no grad path (it is a thresholding op),
+        # so the backward pass flows through z_pre on the active set, which is
+        # the canonical "straight-through on the hard gate" form used by
+        # Rajamanoharan et al. 2024 and matches sae_lens / dictionary_learning.
         gate = (z_pre > theta).to(z_pre.dtype)
-        # Straight-through: forward uses hard gate, backward uses soft pass-through.
-        gate_st = gate + (z_pre.sigmoid() - z_pre.sigmoid().detach()) * 0.0
-        return z_pre * gate_st
+        return z_pre * gate
 
     def sparsity_loss(self, z: torch.Tensor) -> torch.Tensor:
-        # L0-style soft proxy: count active features above threshold.
-        return (z > 0).float().sum(dim=-1).mean()
+        # L0 surrogate: count of nonzero (post-gate) entries. log_theta learning
+        # via a kernel-density STE is deferred to v0.1.1; for v0.1.0.post1 the
+        # threshold stays at init_theta and only encoder/decoder learn.
+        return (z != 0).float().sum(dim=-1).mean()
 
 
 def build_sae(

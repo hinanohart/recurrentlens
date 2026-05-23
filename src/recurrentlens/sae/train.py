@@ -44,8 +44,13 @@ class SAETrainConfig:
 def _cosine_lr(step: int, total: int, warmup: int, base_lr: float) -> float:
     if step < warmup:
         return base_lr * step / max(1, warmup)
-    progress = (step - warmup) / max(1, total - warmup)
-    return base_lr * 0.5 * (1.0 + math.cos(math.pi * min(1.0, progress)))
+    # Avoid the off-by-one zero-LR final step: divide by (total - warmup - 1)
+    # so step==total yields progress==1.0 only at the half-cosine minimum,
+    # which we floor to 1% of base_lr instead of 0.
+    denom = max(1, total - warmup - 1)
+    progress = min(1.0, (step - warmup) / denom)
+    cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+    return base_lr * max(0.01, cosine)
 
 
 def train_sae_from_cache(

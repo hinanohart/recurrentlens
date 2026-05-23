@@ -93,3 +93,26 @@ def test_transform_applied():
     fresh = model.get_layer(0)(x).detach()
     assert torch.allclose(cap, fresh * 2, atol=1e-5)
     handle.remove()
+
+
+def test_ssm_h_t_warning_is_emitted_once_per_module():
+    """Regression: v0.1.0 emitted the ssm_h_t proxy warning on every call
+    (including every forward pass via _resolve_target). v0.1.0.post1 dedupes
+    by module id so the warning fires once per (module, lifetime).
+    """
+    import warnings as w
+
+    from recurrentlens.hooks.registry import _SSM_HT_WARNED, resolve_target
+
+    model = _FakeWrapper(n_layers=1, d=4)
+    layer = model.get_layer(0)
+    # clear the de-dup set so this test is order-independent
+    _SSM_HT_WARNED.clear()
+
+    with w.catch_warnings(record=True) as records:
+        w.simplefilter("always")
+        for _ in range(20):
+            resolve_target(layer, "ssm_h_t")
+
+    matching = [r for r in records if "proxy" in str(r.message)]
+    assert len(matching) == 1, f"expected 1 ssm_h_t warning across 20 calls, got {len(matching)}"

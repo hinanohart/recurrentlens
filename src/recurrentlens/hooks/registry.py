@@ -50,7 +50,10 @@ class HookHandle:
         self._cache_ref.clear()
 
 
-def _resolve_target(layer_module: Any, site: HookSite) -> Any:
+_SSM_HT_WARNED: set[int] = set()
+
+
+def resolve_target(layer_module: Any, site: HookSite) -> Any:
     """Pick the submodule that the forward hook attaches to."""
     if site == "out_proj_out":
         # HF Mamba has layer.mixer.out_proj. Legacy: layer.out_proj. Fallback: layer itself.
@@ -76,17 +79,25 @@ def _resolve_target(layer_module: Any, site: HookSite) -> Any:
                     break
                 obj = getattr(obj, attr)
             if ok:
-                warnings.warn(
-                    "ssm_h_t hook attached to closest SSM submodule output, "
-                    "which is a proxy for the recurrent state. For exact h_t, "
-                    "use the nnsight backend (recurrentlens[nnsight], v0.1.x).",
-                    UserWarning,
-                    stacklevel=3,
-                )
+                key = id(obj)
+                if key not in _SSM_HT_WARNED:
+                    _SSM_HT_WARNED.add(key)
+                    warnings.warn(
+                        "ssm_h_t hook attached to closest SSM submodule output, "
+                        "which is a proxy for the recurrent state. For exact h_t, "
+                        "use the nnsight backend (recurrentlens[nnsight], v0.1.x). "
+                        "This warning is emitted once per layer module.",
+                        UserWarning,
+                        stacklevel=3,
+                    )
                 return obj
         return layer_module
     else:
         raise ValueError(f"unknown hook site: {site!r}")
+
+
+# Back-compat alias for internal callers; will be removed in v0.2.
+_resolve_target = resolve_target
 
 
 def register_hook(
@@ -109,7 +120,7 @@ def register_hook(
     -------
     HookHandle with ``.activations`` list and ``.remove()`` method.
     """
-    target = _resolve_target(model.get_layer(layer), site)
+    target = resolve_target(model.get_layer(layer), site)
     cache: list[Any] = []
 
     def _hook(_module: Any, _inputs: Any, output: Any) -> None:

@@ -20,10 +20,10 @@ def steer(model: Any, sae: Any, feature_id: int, vector_scale: float = 1.0):
     """Inject ``vector_scale * sae.W_dec[feature_id]`` at the SAE's layer/site."""
     import torch
 
-    from recurrentlens.hooks.registry import _resolve_target
+    from recurrentlens.hooks.registry import resolve_target
 
     layer_module = model.get_layer(sae.layer)
-    target = _resolve_target(layer_module, sae.hook_site)
+    target = resolve_target(layer_module, sae.hook_site)
 
     direction = sae.W_dec[feature_id].detach()  # (d_in,)
 

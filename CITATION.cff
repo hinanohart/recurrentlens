@@ -3,7 +3,7 @@ message: "If you use recurrentlens in academic work, please cite it as below."
 title: "recurrentlens: mechanistic interpretability for State-Space Models"
 authors:
   - family-names: "hinanohart"
-version: 0.1.0
+version: 0.1.0.post1
 date-released: 2026-05-23
 license: Apache-2.0
 repository-code: "https://github.com/hinanohart/recurrentlens"
@@ -13,5 +13,17 @@ keywords:
   - state-space-models
   - mamba
 notes: |
-  v0.1.0 ships framework + scaffold + smoke + Colab notebooks. Pretrained
-  Mamba-130M SAE artifacts land in v0.1.1 (community Colab T4).
+  v0.1.0.post1 ships a framework + scaffold + smoke + 3 Colab notebooks.
+  Pretrained Mamba-130M SAE artifacts land in v0.1.1 (community Colab T4).
+
+  The shipped train_sae default is n_tokens=200_000, sized for a CPU smoke
+  run. The research-grade design target is 100M+ tokens; v0.1.1 pretrained
+  artifacts will be trained at that scale.
+
+  v0.1.0.post1 is a correctness hotfix on top of v0.1.0:
+    - JumpReLU straight-through estimator (was a `* 0.0` no-op in v0.1.0).
+    - bench.evaluate: removed the ce_recovery_proxy ratio (added ce_delta).
+    - viz.feature_explorer: HTML-escape user-controlled fields (XSS guard).
+    - hub.load_sae: validate safetensors metadata before construction.
+    - L0 metric: count (z != 0), matching the standard SAE convention.
+  See CHANGELOG.md for the full list.

@@ -67,14 +67,27 @@ def test_ablate_zero_removes_feature_contribution():
     model = _FakeWrapper(d=8)
     sae = VanillaSAE(d_in=8, d_sae=16, hook_site="out_proj_out", layer=0)
     x = torch.randn(2, 8)
-    base = model.get_layer(0)(x).clone()
+    base = model.get_layer(0)(x).detach().clone()
+
     with ablate(model, sae, feature_id=0, strength=0.0):
-        ablated = model.get_layer(0)(x).clone()
-    # Ablation should differ from base unless feature 0 was already zero.
-    # We don't assert magnitude — just that hook fires and removes cleanly.
+        ablated = model.get_layer(0)(x).detach().clone()
+
+    # Analytic expectation: the hook adds (decode(z_masked) - decode(z)) to the
+    # layer's output, where z_masked zeros out feature 0.
+    with torch.no_grad():
+        flat = base.reshape(-1, 8).to(sae.W_enc.dtype)
+        z = sae.encode(flat)
+        z_masked = z.clone()
+        z_masked[..., 0] = 0.0
+        expected_delta = (sae.decode(z_masked) - sae.decode(z)).to(base.dtype).reshape(base.shape)
+    assert torch.allclose(ablated - base, expected_delta, atol=1e-5), (
+        "ablate(strength=0) did not match the analytic feature-zero delta"
+    )
+
     with ablate(model, sae, feature_id=0, strength=1.0):
-        identity = model.get_layer(0)(x).clone()
-    # strength=1.0 means feature is unchanged → SAE reconstruction substituted twice,
-    # so output should equal the SAE forward through the layer (not exactly base but stable)
-    assert ablated.shape == base.shape
-    assert identity.shape == base.shape
+        identity = model.get_layer(0)(x).detach().clone()
+    # strength=1.0 means the feature is left untouched: x_hat_masked == x_hat, so
+    # the additive correction is zero.
+    assert torch.allclose(identity, base, atol=1e-5), (
+        "ablate(strength=1.0) should be a no-op on the layer output"
+    )

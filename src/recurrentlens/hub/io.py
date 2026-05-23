@@ -9,6 +9,7 @@ path — we only pass ``token=True`` to let huggingface_hub read its own cache.
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 
 from recurrentlens.sae.base import BaseSAE
@@ -47,16 +48,17 @@ def push_sae(
             private=private,
         )
 
-    tmp_dir = Path(os.getenv("RECURRENTLENS_HUB_TMP", "/tmp")) / repo_id.replace("/", "_")
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    local_path = tmp_dir / filename
-    sae.save(str(local_path))
-
-    api.upload_file(
-        path_or_fileobj=str(local_path),
-        path_in_repo=filename,
-        repo_id=repo_id,
-        repo_type="model",
-        commit_message=commit_message or f"Upload {sae.variant} SAE for {sae.model_id}",
-    )
+    # Use a self-cleaning temporary directory; honor RECURRENTLENS_HUB_TMP as the
+    # parent dir for users who need to stage on a specific volume.
+    parent = os.getenv("RECURRENTLENS_HUB_TMP") or None
+    with tempfile.TemporaryDirectory(prefix="recurrentlens_push_", dir=parent) as tmp_dir:
+        local_path = Path(tmp_dir) / filename
+        sae.save(str(local_path))
+        api.upload_file(
+            path_or_fileobj=str(local_path),
+            path_in_repo=filename,
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message=commit_message or f"Upload {sae.variant} SAE for {sae.model_id}",
+        )
     return f"https://huggingface.co/{repo_id}"

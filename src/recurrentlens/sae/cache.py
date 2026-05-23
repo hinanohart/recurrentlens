@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,14 @@ class ActivationCache:
                 os.close(fd)
                 path = tmp
             self._path = Path(path)
+            if self._path.exists() and self._path.stat().st_size > 0:
+                warnings.warn(
+                    f"ActivationCache mmap path {self._path} exists and will be "
+                    "truncated to a fresh (capacity, d_in) buffer. Pass a new "
+                    "path or backend='ram' to preserve existing data.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             self._store = np.memmap(
                 self._path, mode="w+", shape=(self.capacity, self.d_in), dtype=self.dtype
             )

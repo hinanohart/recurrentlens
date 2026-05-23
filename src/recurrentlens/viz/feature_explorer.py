@@ -8,7 +8,13 @@ Richer interactivity (cross-feature highlights, n-way diff) lives in v0.1.x.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from html import escape as _html_escape
 from typing import Any
+
+
+def _safe(value: Any) -> str:
+    return _html_escape(str(value), quote=True)
+
 
 _HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
@@ -52,7 +58,7 @@ def _row(rank: int, act: float, max_act: float, context: str) -> str:
     return (
         f"<tr><td>{rank}</td>"
         f"<td class='act'><span class='bar' style='width:{bar_w}px'></span> {act:.3f}</td>"
-        f"<td><span class='tok'>{context}</span></td></tr>"
+        f"<td><span class='tok'>{_safe(context)}</span></td></tr>"
     )
 
 
@@ -117,15 +123,24 @@ def feature_explorer(
                 context = ctx_list[idx] if idx < len(ctx_list) else f"[sample idx {idx}]"
                 rows_html += _row(rank + 1, act, max(max_act, 1e-9), context)
 
+    no_acts_banner = (
+        "<tr><td colspan='3' style='color:#7a4500; background:#fff7e6; "
+        "padding:0.6em 0.8em; border-left:3px solid #f0a000;'>"
+        "&#9888; <b>No activations provided.</b> Pass "
+        "<code>activations=&lt;tensor&gt;</code> (and optionally "
+        "<code>contexts=[...]</code>) to render the top-k preview. "
+        "See <code>notebooks/02_explore_pretrained.ipynb</code> for a runnable example."
+        "</td></tr>"
+    )
+
     html = _HTML_TEMPLATE.format(
-        feature_id=feature_id,
-        model_id=getattr(sae, "model_id", "") or "?",
-        hook_site=getattr(sae, "hook_site", "?"),
-        layer=getattr(sae, "layer", "?"),
-        variant=getattr(sae, "variant", "?"),
-        d_sae=getattr(sae, "d_sae", "?"),
-        rows=rows_html
-        or "<tr><td colspan='3' style='color:#999;'>No activations provided; pass activations=<i>tensor</i> for top-k preview.</td></tr>",
+        feature_id=int(feature_id),
+        model_id=_safe(getattr(sae, "model_id", "") or "?"),
+        hook_site=_safe(getattr(sae, "hook_site", "?")),
+        layer=_safe(getattr(sae, "layer", "?")),
+        variant=_safe(getattr(sae, "variant", "?")),
+        d_sae=_safe(getattr(sae, "d_sae", "?")),
+        rows=rows_html or no_acts_banner,
         wdec_norm=wdec_norm,
         sample_size=sample_size,
     )

@@ -93,7 +93,9 @@ class BaseSAE(nn.Module):
         sparsity = self.sparsity_loss(z)
         total = recon + l1_coeff * sparsity
         with torch.no_grad():
-            l0 = (z > 0).float().sum(dim=-1).mean().item()
+            # Count signed-nonzero entries (matches standard L0 convention; for
+            # JumpReLU/TopK variants whose activations may include negatives).
+            l0 = (z != 0).float().sum(dim=-1).mean().item()
         return total, {"recon_mse": recon.item(), "l1": sparsity.item(), "l0": l0}
 
     def save(self, path: str) -> None:
@@ -117,6 +119,8 @@ class BaseSAE(nn.Module):
             meta = f.metadata() or {}
             tensors = {k: f.get_tensor(k) for k in f.keys()}  # noqa: SIM118
 
+        _validate_sae_meta(meta, tensors)
+
         from recurrentlens.sae.variants import build_sae
 
         sae = build_sae(
@@ -129,3 +133,32 @@ class BaseSAE(nn.Module):
         )
         sae.load_state_dict(tensors)
         return sae
+
+
+_VALID_VARIANTS = {"vanilla", "topk", "jumprelu"}
+
+
+def _validate_sae_meta(meta: dict[str, str], tensors: dict[str, Any]) -> None:
+    """Refuse to construct an SAE from a safetensors file with inconsistent
+    metadata. Catches malformed/tampered Hub artifacts before they crash in
+    obscure shape-mismatch sites deep inside the loader.
+    """
+    variant = meta.get("variant")
+    if variant not in _VALID_VARIANTS:
+        raise ValueError(
+            f"SAE safetensors metadata has unknown variant={variant!r}; "
+            f"expected one of {sorted(_VALID_VARIANTS)}"
+        )
+    try:
+        d_in = int(meta["d_in"])
+        d_sae = int(meta["d_sae"])
+    except (KeyError, ValueError) as exc:
+        raise ValueError("SAE safetensors metadata missing or malformed d_in/d_sae") from exc
+    w_enc = tensors.get("W_enc")
+    if w_enc is None:
+        raise ValueError("SAE safetensors file has no W_enc tensor")
+    if tuple(w_enc.shape) != (d_in, d_sae):
+        raise ValueError(
+            f"SAE safetensors metadata claims (d_in={d_in}, d_sae={d_sae}) "
+            f"but W_enc has shape {tuple(w_enc.shape)}"
+        )

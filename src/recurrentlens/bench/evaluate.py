@@ -64,7 +64,9 @@ def evaluate(
                 denom = x.var(dim=0).mean().item() + 1e-9
                 report.metrics["fvu"] = float(mse / denom)  # fraction of variance unexplained
             if "l0" in requested:
-                l0 = (z > 0).float().sum(dim=-1).mean().item()
+                # Count signed-nonzero entries (matches standard L0 convention
+                # for SAEs that admit negative activations, e.g. JumpReLU).
+                l0 = (z != 0).float().sum(dim=-1).mean().item()
                 report.metrics["l0"] = float(l0)
 
     if "ce_recovery" in requested:
@@ -74,9 +76,15 @@ def evaluate(
             ce_clean, ce_sae = _ce_recovery(model, sae, token_batch)
             report.metrics["ce_clean"] = float(ce_clean)
             report.metrics["ce_sae"] = float(ce_sae)
-            # standard "CE recovery": (ce_zero_ablation - ce_sae) / (ce_zero_ablation - ce_clean)
-            # we approximate with ce_clean / ce_sae as a quick proxy in this MVP.
-            report.metrics["ce_recovery_proxy"] = float(ce_clean / max(1e-9, ce_sae))
+            # Interim signal: lower is better; 0 = SAE reconstruction is as good
+            # as the clean activation. The standard CE recovery formula
+            #   (ce_zero_ablation - ce_sae) / (ce_zero_ablation - ce_clean)
+            # requires a third zero-ablation forward pass and ships in v0.1.1.
+            report.metrics["ce_delta"] = float(ce_sae - ce_clean)
+            report.notes.append(
+                "ce_recovery (standard formula) requires a zero-ablation baseline; "
+                "ships in v0.1.1. ce_delta = ce_sae - ce_clean is the interim signal."
+            )
 
     return report
 
@@ -86,7 +94,7 @@ def _ce_recovery(model: Any, sae: Any, token_batch: Any) -> tuple[float, float]:
     import torch
     import torch.nn.functional as F
 
-    from recurrentlens.hooks.registry import _resolve_target
+    from recurrentlens.hooks.registry import resolve_target
 
     def _ce(logits: Any, labels: Any) -> float:
         # next-token: shift by one
@@ -100,7 +108,7 @@ def _ce_recovery(model: Any, sae: Any, token_batch: Any) -> tuple[float, float]:
         ce_clean = _ce(logits_clean, token_batch)
 
         layer_module = model.get_layer(sae.layer)
-        target = _resolve_target(layer_module, sae.hook_site)
+        target = resolve_target(layer_module, sae.hook_site)
 
         def _sub_hook(_m: Any, _i: Any, output: Any) -> Any:
             primary = output[0] if isinstance(output, tuple) else output

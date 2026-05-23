@@ -54,3 +54,56 @@ def test_bench_report_dunder():
     assert r["a"] == 0.5
     assert r.to_dict() == {"metrics": {"a": 0.5, "b": 0.25}, "notes": []}
     assert "a=0.5" in repr(r)
+
+
+def test_feature_explorer_escapes_xss():
+    """Regression: v0.1.0 emitted unescaped context / model_id, allowing
+    script injection from Hub-hosted SAEs or hostile fineweb tokens.
+
+    The browser-level test is: no user-controlled bytes may form an executable
+    tag. We verify by stripping the static template chrome and asserting that
+    the remaining user-derived payload contains no literal `<` or `>`.
+    """
+    sae = VanillaSAE(d_in=4, d_sae=8, model_id="<script>alert(1)</script>")
+    acts = torch.randn(3, 4)
+    ctxs = [
+        "<img src=x onerror=alert(2)>",
+        "</span><script>alert(3)</script>",
+        "normal & innocuous",
+    ]
+    out = feature_explorer(sae, feature_id=0, activations=acts, contexts=ctxs, top_k=3)
+
+    # 1. None of the user-payload markers may appear in their raw, executable form.
+    for payload in (
+        "<script>",
+        "</script>",
+        "<img src=x onerror=alert",
+        "</span><script>",
+    ):
+        assert payload not in out.html, f"raw {payload!r} leaked into HTML (XSS)"
+
+    # 2. The escaped form must be present (confirms escape ran, not just absent).
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in out.html, "model_id was not escaped"
+    assert "&lt;img src=x onerror=alert(2)&gt;" in out.html, "context was not escaped"
+
+
+def test_feature_explorer_no_acts_emits_warning_banner():
+    """Regression: a header-only call previously produced a near-blank page
+    that users mistook for success. v0.1.0.post1 surfaces a warning banner.
+    """
+    sae = VanillaSAE(d_in=4, d_sae=8, model_id="m/x")
+    out = feature_explorer(sae, feature_id=0)
+    assert "No activations provided" in out.html
+    # banner uses a salmon background so it cannot be missed
+    assert "#fff7e6" in out.html
+
+
+def test_evaluate_does_not_emit_ce_recovery_proxy():
+    """Regression: ce_recovery_proxy = ce_clean / ce_sae was mathematically
+    meaningless and was removed in v0.1.0.post1.
+    """
+    sae = VanillaSAE(d_in=8, d_sae=16)
+    acts = torch.randn(32, 8)
+    report = evaluate(sae, activations=acts)
+    assert "ce_recovery_proxy" not in report.metrics
+    assert "ce_recovery" not in report.metrics  # full formula deferred to v0.1.1

@@ -10,9 +10,32 @@ from __future__ import annotations
 
 import os
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from recurrentlens.sae.base import BaseSAE
+
+
+def _validate_filename(filename: str) -> None:
+    """Raise ``ValueError`` if *filename* is not a safe relative basename.
+
+    Rejects absolute paths, path separators (``/`` and ``\\``), and ``..``
+    components to prevent path-traversal writes when the public API is called
+    with untrusted input.
+    """
+    p = PurePosixPath(filename)
+    if p.is_absolute():
+        raise ValueError(f"filename must be a relative basename, got absolute path: {filename!r}")
+    # Reject any embedded path separator or parent-directory component.
+    if len(p.parts) != 1 or p.parts[0] == "..":
+        raise ValueError(
+            f"filename must be a plain basename with no path separators or '..' "
+            f"components, got: {filename!r}"
+        )
+    # Also reject Windows-style absolute paths (e.g. "C:\\foo") on any platform.
+    if "\\" in filename:
+        raise ValueError(
+            f"filename must be a plain basename with no path separators, got: {filename!r}"
+        )
 
 
 def load_sae(
@@ -36,7 +59,12 @@ def push_sae(
     """Upload a trained SAE to a Hub repo and return its URL.
 
     Requires ``HF_TOKEN`` env var or a prior ``huggingface-cli login``.
+
+    Raises:
+        ValueError: if *filename* contains path separators or ``..`` components.
     """
+    _validate_filename(filename)
+
     from huggingface_hub import HfApi
 
     api = HfApi()

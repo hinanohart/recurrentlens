@@ -1,0 +1,112 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      # Refuse to release anything containing maintainer real-identity markers.
+      # FRAG pattern: identity tokens are split at source so this guard rule
+      # does not self-match against its own definition. Mirrors aa-animator
+      # / yuragi precedent.
+      - name: Identity-leak guard (history-wide)
+        run: |
+          set -euo pipefail
+          FRAG_A='run''za'
+          FRAG_B='DESKTOP-[A-Z0-9]+'
+          FRAG_C='/mnt/c/'
+          FRAG_D='hin''ata'
+          PATTERN="${FRAG_A}|${FRAG_A}isongpu|${FRAG_B}|${FRAG_C}|/home/${FRAG_A}|${FRAG_D}"
+          FAIL=0
+          REFS=$(git for-each-ref --format='%(refname)' refs/tags refs/heads refs/remotes)
+          REFS="HEAD $REFS"
+          for ref in $REFS; do
+            if git grep -n -E "$PATTERN" "$ref" -- \
+                ':!*.lock' ':!*.svg' ':!*.png' ':!*.jpg' ':!*.mp4' ':!*.gif' ':!*.npy' \
+                ':!.github/workflows/release.yml' \
+                > /tmp/leaks.txt 2>/dev/null; then
+              echo "::error::Identity-leak at ref $ref:"
+              cat /tmp/leaks.txt
+              FAIL=1
+            fi
+          done
+          exit $FAIL
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install build tools
+        run: |
+          # Pin versions: these produce and inspect the sdist/wheel that the
+          # OIDC publish step later signs, so a compromise upstream would let a
+          # malicious package reach PyPI under our name. Dependabot's pip group
+          # (`.github/dependabot.yml`) rotates both on its weekly cadence.
+          python -m pip install --upgrade pip
+          # twine>=6 required for Metadata-Version 2.4 emitted by hatchling>=1.21.
+          pip install 'build==1.2.2.post1' 'twine==6.2.0'
+      - name: Build sdist + wheel
+        run: python -m build
+      - name: Twine check
+        run: twine check dist/*
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    name: Publish to PyPI (Trusted Publishing)
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/recurrentlens
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+      - name: Publish
+        # SHA-pinned rather than following the mutable `release/v1` branch,
+        # because this step runs with `id-token: write` and a compromise of
+        # the upstream action would publish arbitrary code to PyPI as
+        # `recurrentlens`. Dependabot (pip + github-actions groups in
+        # .github/dependabot.yml) rotates the pin.
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+
+  github-release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            dist/*

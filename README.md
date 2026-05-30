@@ -3,7 +3,7 @@
 **Mechanistic interpretability for State-Space Models.** Sparse autoencoders, feature visualization, and a Hub registry for Mamba / Mamba-2.
 
 [![CI](https://github.com/hinanohart/recurrentlens/actions/workflows/ci.yml/badge.svg)](https://github.com/hinanohart/recurrentlens/actions/workflows/ci.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#status)
 
@@ -106,4 +106,4 @@ See `CITATION.cff`.
 
 ## License
 
-Apache-2.0.
+MIT.
